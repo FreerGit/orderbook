@@ -6,7 +6,7 @@ const Order_Book = struct {
     price_levels: std.MultiArrayList(Level),
     pub fn init(tick_size: f16, allr: std.mem.Allocator) Order_Book {
         var price_levels: std.MultiArrayList(Level) = undefined;
-        inline for (comptime 0..10_000) |idx| {
+        for (0..10_000) |idx| {
             const level = Level{
                 .price = @as(f16, idx) * tick_size,
                 .qty = 0,
