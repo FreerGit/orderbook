@@ -1,17 +1,19 @@
 const std = @import("std");
-const print = std.debug.print;
+const Money = @import("lib/money.zig").Money;
+const debug = @import("lib/util.zig").debug;
 
 const Order_Book = struct {
-    tick_size: f16,
+    tick_size: f64,
     price_levels: std.MultiArrayList(Level),
-    pub fn init(tick_size: f16, allr: std.mem.Allocator) Order_Book {
-        var price_levels: std.MultiArrayList(Level) = undefined;
-        for (0..10_000) |idx| {
+
+    pub fn init(tick_size: f16, allr: std.mem.Allocator) !Order_Book {
+        var price_levels = std.MultiArrayList(Level){};
+        for (0..10) |idx| {
             const level = Level{
-                .price = @as(f16, idx) * tick_size,
-                .qty = 0,
+                .price = Money.of_f64(@as(f64, @floatFromInt(idx)) * tick_size),
+                .qty = Money.of_f64(0.0),
             };
-            price_levels.insert(allr, idx, level);
+            try price_levels.append(allr, level);
         }
         return Order_Book{
             .tick_size = tick_size,
@@ -21,17 +23,14 @@ const Order_Book = struct {
 };
 
 const Level = struct {
-    price: i32,
-    qty: u32,
+    price: Money,
+    qty: Money,
 };
 
-fn debug(comptime fmt: []const u8, args: anytype) void {
-    print(fmt ++ "\n", args);
-}
-
 pub fn main() !void {
-    var buffer: [1024 * 1024 * 16]u8 = undefined;
+    var buffer: [1024 * 1024]u8 = undefined;
     var x = std.heap.FixedBufferAllocator.init(&buffer);
-    const ob = Order_Book.init(0.05, x.allocator());
+    var arena = std.heap.ArenaAllocator.init(x.allocator());
+    const ob = Order_Book.init(0.05, arena.allocator());
     debug("{any}", .{ob});
 }
