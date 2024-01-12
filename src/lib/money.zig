@@ -15,6 +15,10 @@ pub const Money = struct {
     pub fn to_f64(m: Money) f64 {
         return m.val / 1_000_000.0;
     }
+
+    pub fn mul(m: *Money, v: f64) void {
+        m.val = m.val * v;
+    }
 };
 
 test "Struct should inline the f64, same size" {
