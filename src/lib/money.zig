@@ -28,6 +28,10 @@ pub const Money = struct {
         m.val = m.val + v.val;
     }
 
+    pub fn sub(m: *Money, v: Money) void {
+        m.val = m.val - v.val;
+    }
+
     pub fn format(
         money: Money,
         comptime _: []const u8,
