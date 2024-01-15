@@ -16,8 +16,25 @@ pub const Money = struct {
         return m.val / 1_000_000.0;
     }
 
-    pub fn mul(m: *Money, v: f64) void {
-        m.val = m.val * v;
+    pub fn mul(m: *Money, v: Money) void {
+        m.val = m.val * v.val;
+    }
+
+    pub fn div(m: *Money, v: Money) void {
+        m.val = m.val / v.val;
+    }
+
+    pub fn add(m: *Money, v: Money) void {
+        m.val = m.val + v.val;
+    }
+
+    pub fn format(
+        money: Money,
+        comptime _: []const u8,
+        _: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = try writer.print("Money {d}", .{money.to_f64()});
     }
 };
 
