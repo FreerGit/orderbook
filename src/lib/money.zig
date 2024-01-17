@@ -1,6 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 const RndGen = std.rand.DefaultPrng;
+const assert = std.debug.assert;
 
 // A Money is stored as 10^-6 units instead of 1 unit. For example:
 //      1.05 dollars -> 1050000.0 Money
@@ -9,6 +10,7 @@ pub const Money = struct {
     val: f64,
 
     pub fn of_f64(v: f64) Money {
+        assert(v >= 0.0);
         return Money{ .val = v * 1_000_000.0 };
     }
 
@@ -16,20 +18,24 @@ pub const Money = struct {
         return m.val / 1_000_000.0;
     }
 
-    pub fn mul(m: *Money, v: Money) void {
-        m.val = m.val * v.val;
+    pub fn mul(l: Money, r: Money) Money {
+        return Money{ .val = l.val * r.val };
     }
 
-    pub fn div(m: *Money, v: Money) void {
-        m.val = m.val / v.val;
+    pub fn div(l: Money, r: Money) Money {
+        return Money{ .val = l.val / r.val };
     }
 
-    pub fn add(m: *Money, v: Money) void {
-        m.val = m.val + v.val;
+    pub fn _div(l: Money, r: f64) Money {
+        return Money{ .val = l.val / r };
     }
 
-    pub fn sub(m: *Money, v: Money) void {
-        m.val = m.val - v.val;
+    pub fn add(l: Money, r: Money) Money {
+        return Money{ .val = l.val + r.val };
+    }
+
+    pub fn sub(l: Money, r: Money) Money {
+        return Money{ .val = l.val - r.val };
     }
 
     pub fn format(

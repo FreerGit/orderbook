@@ -7,16 +7,18 @@ const Order_Book = struct {
     tick_size: f64,
     // ba: Level,
     // bb: Level,
+    // TODO(perf) test SOA vs AOS
     price_levels: std.MultiArrayList(Level),
     start_price: Money,
 
-    pub fn init(tick_size: f64, start_price: Money, allr: std.mem.Allocator) !Order_Book {
+    pub fn init(tick_size: f64, level_count: usize, best_bid: Money, allr: std.mem.Allocator) !Order_Book {
         var price_levels = std.MultiArrayList(Level){};
-        // TODO(robustness) count should be passed and not hardcored.
+        const side_count = Money.of_f64(@round(tick_size * @as(f64, @floatFromInt(level_count))));
+        const lowest_bid = best_bid.sub(side_count);
         var count: f64 = 0;
-        while (count <= 200) {
-            var price = Money.of_f64(count * tick_size);
-            price.add(start_price);
+        const last = @as(f64, @floatFromInt(level_count));
+        while (count < last) {
+            const price = Money.of_f64(count * tick_size).add(lowest_bid);
             const level = Level{
                 .price = price,
                 .qty = Money.of_f64(0.0),
@@ -27,11 +29,15 @@ const Order_Book = struct {
         return Order_Book{
             .tick_size = tick_size,
             .price_levels = price_levels,
-            .start_price = start_price,
+            .start_price = price_levels.get(0).price,
         };
     }
 
-    pub fn snapshot(self: *Order_Book, levels: []Level) !void {
+    pub fn deinit(self: *Order_Book, allr: std.mem.Allocator) void {
+        self.price_levels.deinit(allr);
+    }
+
+    pub fn snapshot(self: *Order_Book, levels: []Level) void {
         for (levels) |lvl| {
             self.update(lvl);
         }
@@ -39,17 +45,17 @@ const Order_Book = struct {
 
     fn get_index(self: *Order_Book, price: Money) usize {
         var copy = price;
-        copy.sub(self.start_price);
-        copy.div(Money.of_f64(self.tick_size));
-        return @as(usize, @intFromFloat(copy.val));
+        copy = copy.sub(self.start_price)._div(self.tick_size);
+        return @as(usize, @intFromFloat(copy.to_f64()));
     }
 
-    pub fn update(self: *Order_Book, level: Level) !void {
+    pub fn update(self: *Order_Book, level: Level) void {
         const idx = self.get_index(level.price);
+        std.debug.assert(idx <= self.price_levels.len);
         self.price_levels.set(idx, level);
     }
 
-    pub fn get_level(self: *Order_Book, price: Money) !Level {
+    pub fn get_level(self: *Order_Book, price: Money) Level {
         return self.price_levels.get(self.get_index(price));
     }
 };
@@ -69,18 +75,32 @@ pub fn main() !void {
     }
 }
 
+test "assert length" {
+    const start_price = Money.of_f64(100.0);
+    var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
+    defer ob.deinit(std.testing.allocator);
+    try std.testing.expect(ob.price_levels.len == 1000);
+}
+
 test "Simple order book update" {
     const start_price = Money.of_f64(100.0);
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-    var ob = try Order_Book.init(0.05, start_price, allocator);
-    const lvl = .{ .price = Money.of_f64(101.0), .qty = Money.of_f64(5.55) };
-    try ob.update(lvl);
-    for (ob.price_levels.items(.price), ob.price_levels.items(.qty)) |p, q| {
-        if (p.to_f64() != 101.0) {
-            try testing.expect(q.to_f64() == 0.0);
-        } else {
-            try testing.expect(q.to_f64() == 5.55);
-        }
-    }
+
+    var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
+    defer ob.deinit(std.testing.allocator);
+    const lvl = .{ .price = Money.of_f64(50.0), .qty = Money.of_f64(5.55) };
+    const lvl_2 = .{ .price = Money.of_f64(50.05), .qty = Money.of_f64(1.0002) };
+    const lvl_3 = .{ .price = Money.of_f64(51), .qty = Money.of_f64(1.22) };
+    const lvl_4 = .{ .price = Money.of_f64(60), .qty = Money.of_f64(1.33) };
+    const last = .{ .price = Money.of_f64(99.95), .qty = Money.of_f64(42.0) };
+
+    ob.update(lvl);
+    try testing.expect(ob.price_levels.get(0).qty.to_f64() == 5.55);
+    ob.update(lvl_2);
+    try testing.expect(ob.price_levels.get(1).qty.to_f64() == 1.0002);
+    ob.update(lvl_3);
+    try testing.expect(ob.price_levels.get(20).qty.to_f64() == 1.22);
+    ob.update(lvl_4);
+    try testing.expect(ob.price_levels.get(200).qty.to_f64() == 1.33);
+    ob.update(last);
+    try testing.expect(ob.price_levels.get(999).qty.to_f64() == 42.0);
 }
