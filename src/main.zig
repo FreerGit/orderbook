@@ -2,6 +2,7 @@ const std = @import("std");
 const Money = @import("lib/money.zig").Money;
 const debug = @import("lib/util.zig").debug;
 const testing = std.testing;
+const assert = std.debug.assert;
 
 const Order_Book = struct {
     tick_size: f64,
@@ -12,9 +13,11 @@ const Order_Book = struct {
     start_price: Money,
 
     pub fn init(tick_size: f64, level_count: usize, best_bid: Money, allr: std.mem.Allocator) !Order_Book {
+        assert(level_count % 2 == 0); // divisible by 2, otherwise uneven sides.
         var price_levels = std.MultiArrayList(Level){};
         const side_count = Money.of_f64(@round(tick_size * @as(f64, @floatFromInt(level_count))));
-        const lowest_bid = best_bid.sub(side_count);
+        debug("{d}", .{side_count.to_f64()});
+        const lowest_bid = best_bid.sub(side_count._div(2.0));
         var count: f64 = 0;
         const last = @as(f64, @floatFromInt(level_count));
         while (count < last) {
@@ -23,6 +26,7 @@ const Order_Book = struct {
                 .price = price,
                 .qty = Money.of_f64(0.0),
             };
+            assert(level.price.val >= 0.0);
             try price_levels.append(allr, level);
             count += 1;
         }
@@ -50,6 +54,7 @@ const Order_Book = struct {
     }
 
     pub fn update(self: *Order_Book, level: Level) void {
+        // TODO(feat) check if index is out of bounds and then realloc.
         const idx = self.get_index(level.price);
         std.debug.assert(idx <= self.price_levels.len);
         self.price_levels.set(idx, level);
@@ -68,7 +73,7 @@ const Level = struct {
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     const start_price = Money.of_f64(100.0);
-    const ob = try Order_Book.init(0.05, start_price, arena.allocator());
+    const ob = try Order_Book.init(0.05, 1000, start_price, arena.allocator());
     defer arena.deinit();
     for (ob.price_levels.items(.price), ob.price_levels.items(.qty)) |p, q| {
         debug("{d}, {d}", .{ p, q });
@@ -87,12 +92,11 @@ test "Simple order book update" {
 
     var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
     defer ob.deinit(std.testing.allocator);
-    const lvl = .{ .price = Money.of_f64(50.0), .qty = Money.of_f64(5.55) };
-    const lvl_2 = .{ .price = Money.of_f64(50.05), .qty = Money.of_f64(1.0002) };
-    const lvl_3 = .{ .price = Money.of_f64(51), .qty = Money.of_f64(1.22) };
-    const lvl_4 = .{ .price = Money.of_f64(60), .qty = Money.of_f64(1.33) };
-    const last = .{ .price = Money.of_f64(99.95), .qty = Money.of_f64(42.0) };
-
+    const lvl = .{ .price = Money.of_f64(75.0), .qty = Money.of_f64(5.55) };
+    const lvl_2 = .{ .price = Money.of_f64(75.05), .qty = Money.of_f64(1.0002) };
+    const lvl_3 = .{ .price = Money.of_f64(76), .qty = Money.of_f64(1.22) };
+    const lvl_4 = .{ .price = Money.of_f64(85), .qty = Money.of_f64(1.33) };
+    const last = .{ .price = Money.of_f64(124.95), .qty = Money.of_f64(42.0) };
     ob.update(lvl);
     try testing.expect(ob.price_levels.get(0).qty.to_f64() == 5.55);
     ob.update(lvl_2);
