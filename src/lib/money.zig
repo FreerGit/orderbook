@@ -9,7 +9,7 @@ const assert = std.debug.assert;
 pub const Money = struct {
     val: f64,
 
-    pub fn of_f64(v: f64) Money {
+    pub fn new(v: f64) Money {
         assert(v >= 0.0);
         return Money{ .val = v * 1_000_000.0 };
     }
@@ -56,7 +56,7 @@ test "f64 -> Money -> f64 should not change f64" {
     var rnd = RndGen.init(0);
     for (0..10_000) |_| {
         const some_random_number = rnd.random().intRangeAtMost(i64, 1, 9_999_999);
-        const money = Money.of_f64(@as(f64, @floatFromInt(some_random_number)));
+        const money = Money.new(@as(f64, @floatFromInt(some_random_number)));
         try testing.expect(@as(f64, @floatFromInt(some_random_number)) == money.to_f64());
     }
 }
@@ -65,14 +65,14 @@ test "Money -> f64 -> Money should not change the val" {
     var rnd = RndGen.init(0);
     for (0..10_000) |_| {
         const some_random_number = rnd.random().intRangeAtMost(i64, 1, 9_999_999);
-        const money = Money.of_f64(@as(f64, @floatFromInt(some_random_number)));
-        try testing.expect(Money.of_f64(money.to_f64()).to_f64() == @as(f64, @floatFromInt(some_random_number)));
+        const money = Money.new(@as(f64, @floatFromInt(some_random_number)));
+        try testing.expect(Money.new(money.to_f64()).to_f64() == @as(f64, @floatFromInt(some_random_number)));
     }
 }
 
 test "Min and max" {
-    const max = Money.of_f64(0.000001);
-    const min = Money.of_f64(9_999_999_999.999_999);
+    const max = Money.new(0.000001);
+    const min = Money.new(9_999_999_999.999_999);
 
     try testing.expect(max.to_f64() == 0.000001);
     try testing.expect(min.to_f64() == 9_999_999_999.999_999);
