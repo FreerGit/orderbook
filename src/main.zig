@@ -1,5 +1,5 @@
 const std = @import("std");
-const Money = @import("lib/money.zig").Money;
+const Money = @import("money").Money;
 const testing = std.testing;
 const assert = std.debug.assert;
 
@@ -115,16 +115,6 @@ const Level = struct {
         return .{ .price = Money.new(price), .qty = Money.new(qty) };
     }
 };
-
-pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
-    const start_price = Money.new(100.0);
-    const ob = try Order_Book.init(0.05, 1000, start_price, arena.allocator());
-    defer arena.deinit();
-    for (ob.price_levels.items(.price), ob.price_levels.items(.qty)) |p, q| {
-        debug("{d}, {d}", .{ p, q });
-    }
-}
 
 test "assert length" {
     const start_price = Money.new(100.0);
