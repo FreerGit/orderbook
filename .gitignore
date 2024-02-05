@@ -1,0 +1,8 @@
+zig-cache
+zig-out
+
+# Build location
+target/*
+
+# Taskfile cache
+.task

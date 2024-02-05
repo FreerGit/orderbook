@@ -1,0 +1,33 @@
+version: 3
+
+tasks:
+  build:
+    cmds:
+      - odin build src/ -out:target/money -o:speed -error-pos-style:unix
+    sources:
+      - ./src/**/*.odin
+    generates:
+      - target/mpsc
+    silent: true
+
+  run:
+    cmds:
+      - ./target/money
+    deps:
+      - build
+    silent: true
+
+  test:
+    cmds:
+      # - clear
+      - odin test src/ -out:target/money-test 
+    sources:
+      - ./src/**/*.odin
+    generates:
+      - ./target/money-test
+    silent: true
+    
+  clean:
+    cmds:
+      - rm -r ./target/*
+    silent: true
