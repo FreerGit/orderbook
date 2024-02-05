@@ -1,0 +1,33 @@
+version: 3
+
+tasks:
+  build:
+    cmds:
+      - odin build src/ -out:target/orderbook -o:speed -error-pos-style:unix
+    sources:
+      - ./src/**/*.odin
+    generates:
+      - target/orderbook
+    silent: true
+
+  run:
+    cmds:
+      - ./target/orderbook
+    deps:
+      - build
+    silent: true
+
+  test:
+    cmds:
+      # - clear
+      - odin test src/ -out:target/orderbook-test 
+    sources:
+      - ./src/**/*.odin
+    generates:
+      - ./target/orderbook-test
+    silent: true
+    
+  clean:
+    cmds:
+      - rm -r ./target/*
+    silent: true
