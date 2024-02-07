@@ -20,7 +20,7 @@ tasks:
   test:
     cmds:
       # - clear
-      - odin test src/ -out:target/money-test 
+      - odin test src/ -out:target/money-test -error-pos-style:unix
     sources:
       - ./src/**/*.odin
     generates:

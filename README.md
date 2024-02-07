@@ -2,32 +2,12 @@
 A floating point representation of Money, with 15 digits of guaranteed precision. Money is represented with an f64 with units of 10^-6.
 
 ## Install
-1. Declare Money as a dependecy:
+You can simply copy the code into a new package or usage something like git subtree
 ```console
-zig fetch --save git+https://github.com/freergit/money.git#main
+git subtree pull --prefix subtree_directory https://github.com/freergit/money main --squash
 ```
 
-2. Expose Money as a module in build.zig:
-```zig
-const std = @import("std");
+## Notes
+The multiplying and dividing procedures (with Money or f64) may be entirely nonsensical, haven't decided the use case yet.
 
-pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-
-    const money_dep = b.dependency("money", .{ .target = target, .optimize = optimize });
-    const money_module = money_dep.module("money");
-
-    const exe = b.addExecutable(.{
-        .name = "my-project",
-        .root_source_file = .{ .path = "src/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    exe.root_module.addImport("money", money_module);
-    
-    // ...
-}
-```
-
-Of course, you can use simply download the repo and build it instead of using the package manager.
+I will probaly expose a function that allows for division/multiplication with uint, again this will be used carefully otherwise big bad.
