@@ -31,3 +31,8 @@ tasks:
     cmds:
       - rm -r ./target/*
     silent: true
+
+  update:
+    cmds:
+      - git subtree pull --prefix money https://github.com/freergit/money.git main --squash
+      
