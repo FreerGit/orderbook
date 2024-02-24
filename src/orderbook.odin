@@ -58,10 +58,58 @@ new_orderbook :: proc(tick_size: f64, levels: int, bb: money.Money) -> (Order_Bo
 
 }
 
-get_index :: proc(ob: ^Order_Book, price: money.Money) -> u64 {
+snapshot :: proc(ob: ^Order_Book, bids: []Level, asks: []Level) {
+	ob.bb = bids[0]
+	ob.ba = asks[0]
+	for lvl in bids {
+		update(ob, lvl, Side.Bid)
+	}
+	for lvl in asks {
+		update(ob, lvl, Side.Ask)
+	}
+}
+
+update :: proc(ob: ^Order_Book, level: Level, side: Side) {
+	// TODO(feat) check if index is out of bounds and then realloc.
+	idx := get_index(ob, level.price)
+	assert(idx <= len(ob.price_levels))
+
+	// A better bid/ask was submitted
+	if (side == .Bid && level.price.v > ob.bb.price.v) {
+		ob.bb = level
+	} else if (side == .Ask && level.price.v < ob.bb.price.v) {
+		ob.ba = level
+	}
+
+	// Current best bid/ask was removed
+	if (level.size.v == 0.0 && level.price.v == ob.bb.price.v) {
+		for i in 1 ..= len(ob.price_levels) {
+			count := cast(f64)i
+			next_level := get_level(ob, money.sub(level.price, money.new(ob.tick_size * count)))
+			if next_level.size.v != 0. {
+				ob.bb = next_level
+				break
+			}
+		}
+	} else if (level.size.v == 0.0 && level.price.v == ob.ba.price.v) {
+		for i in 1 ..= len(ob.price_levels) {
+			count := cast(f64)i
+			next_level := get_level(ob, money.sub(level.price, money.new(ob.tick_size * count)))
+			if next_level.size.v != 0. {
+				ob.ba = next_level
+				break
+			}
+		}
+	}
+
+	ob.price_levels[idx] = level
+}
+
+@(private)
+get_index :: proc(ob: ^Order_Book, price: money.Money) -> int {
 	copy := price
 	copy = money._div(money.sub(copy, ob.start_price), ob.tick_size)
-	index := cast(u64)money.to_f64(copy)
+	index := cast(int)money.to_f64(copy)
 	// TODO(feat) check if index is out of bounds and then realloc.
 	assert(index >= 0)
 	return index
@@ -70,8 +118,6 @@ get_index :: proc(ob: ^Order_Book, price: money.Money) -> u64 {
 get_level :: proc(ob: ^Order_Book, price: money.Money) -> Level {
 	return ob.price_levels[get_index(ob, price)]
 }
-
-main :: proc() {}
 
 
 @(test, private)
@@ -93,9 +139,7 @@ assert_length_test :: proc(t: ^testing.T) {
 	ob, err := new_orderbook(0.05, 1000, start_price)
 	testing.expect_value(t, err, nil)
 	testing.expect(t, len(ob.price_levels) == 1000)
-	for level in ob.price_levels {
-		fmt.println(money.to_f64(level.price))
-	}
+
 }
 
 @(test, private)
@@ -111,7 +155,7 @@ lower_and_upper_init_test :: proc(t: ^testing.T) {
 }
 
 @(test, private)
-get_level_based_on_price :: proc(t: ^testing.T) {
+get_level_based_on_price_test :: proc(t: ^testing.T) {
 	start_price := money.new(10_000.0)
 	ob, err := new_orderbook(0.05, 100, start_price)
 	testing.expect_value(t, err, nil)
@@ -122,4 +166,87 @@ get_level_based_on_price :: proc(t: ^testing.T) {
 	testing.expect_value(t, get_level(&ob, money.new(10_000.05)), ob.price_levels[51])
 	testing.expect_value(t, get_level(&ob, money.new(9999.95)), ob.price_levels[49])
 	testing.expect_value(t, get_level(&ob, money.new(9997.55)), ob.price_levels[1])
+}
+
+@(test, private)
+simple_ob_update_test :: proc(t: ^testing.T) {
+	start_price := money.new(100.0)
+
+	ob, err := new_orderbook(0.05, 1000, start_price)
+	testing.expect_value(t, err, nil)
+
+	lvl := Level {
+		price = money.new(75.),
+		size  = money.new(5.55),
+	}
+	lvl_2 := Level {
+		price = money.new(75.05),
+		size  = money.new(1.0002),
+	}
+	lvl_3 := Level {
+		price = money.new(76.),
+		size  = money.new(1.22),
+	}
+	lvl_4 := Level {
+		price = money.new(85.),
+		size  = money.new(1.33),
+	}
+	lvl_5 := Level {
+		price = money.new(124.95),
+		size  = money.new(42.0),
+	}
+	update(&ob, lvl, .Bid)
+	testing.expect_value(t, money.to_f64(ob.price_levels[0].size), 5.55)
+	update(&ob, lvl_2, .Bid)
+	testing.expect_value(t, money.to_f64(ob.price_levels[1].size), 1.0002)
+	update(&ob, lvl_3, .Bid)
+	testing.expect_value(t, money.to_f64(ob.price_levels[20].size), 1.22)
+	update(&ob, lvl_4, .Bid)
+	testing.expect_value(t, money.to_f64(ob.price_levels[200].size), 1.33)
+	update(&ob, lvl_5, .Ask)
+	testing.expect_value(t, money.to_f64(ob.price_levels[999].size), 42.0)
+}
+
+
+@(test, private)
+snapshot_test :: proc(t: ^testing.T) {
+	start_price := money.new(2500.)
+	ob, err := new_orderbook(0.05, 1000, start_price)
+	testing.expect_value(t, err, nil)
+
+	bids := [3]Level{new_level(2500., 1.), new_level(2499.95, 1.5), new_level(2499.9, 2.1)}
+	asks := [3]Level{new_level(2500.05, 1.), new_level(2500.1, 1.5), new_level(2500.15, 2.1)}
+	snapshot(&ob, bids[:], asks[:])
+
+	testing.expect_value(t, get_level(&ob, money.new(2500.)), ob.bb)
+	testing.expect_value(t, get_level(&ob, money.new(2500.05)), ob.ba)
+}
+
+bb_ba_updates_test :: proc(t: ^testing.T) {
+	start_price := money.new(2500.)
+	ob, err := new_orderbook(0.05, 1000, start_price)
+	testing.expect_value(t, err, nil)
+
+	bids := [3]Level{new_level(1000., 1.), new_level(999.95, 1.5), new_level(999.9, 2.1)}
+	asks := [3]Level{new_level(1000.05, 1.), new_level(1000.1, 1.5), new_level(1000.15, 2.1)}
+
+	snapshot(&ob, bids[:], asks[:])
+
+	testing.expect_value(t, get_level(&ob, money.new(1000.)), ob.bb)
+	testing.expect_value(t, get_level(&ob, money.new(1000.05)), ob.ba)
+
+	update(&ob, new_level(1000., 0.), .Bid)
+	new_best_bid := new_level(1001., 5.)
+	update(&ob, new_best_bid, .Bid)
+
+	testing.expect_value(t, new_best_bid, ob.bb)
+	testing.expect_value(t, get_level(&ob, money.new(1000.05)), ob.ba)
+
+	update(&ob, new_level(1000.05, 0.), .Ask)
+	testing.expect_value(t, new_best_bid, ob.bb)
+	testing.expect_value(t, new_level(1000.1, 1.5), ob.ba)
+
+	new_best_ask := new_level(1000.05, 5.55)
+	update(&ob, new_best_ask, .Ask)
+	testing.expect_value(t, new_level(1000.05, 5.55), ob.ba)
 }
