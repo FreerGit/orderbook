@@ -1,0 +1,13 @@
+.{
+    .name = "orderbook",
+    .version = "0.1.0",
+    .dependencies = .{
+        .money = .{
+            .url = "git+https://github.com/freergit/money.git#main",
+            .hash = "12205ffa044acfc50fcb6e2839531a4b69800dda2c11cf62c968a018b23b9d8d6e6b",
+        },
+    },
+    .paths = .{
+        "",
+    },
+}
