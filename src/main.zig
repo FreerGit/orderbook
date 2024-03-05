@@ -10,6 +10,8 @@ const Order_Book = struct {
     // TODO(perf) test SOA vs AOS
     price_levels: std.MultiArrayList(Level),
     start_price: Money,
+    level_count: usize,
+    allr: std.mem.Allocator,
 
     pub fn init(tick_size: f64, level_count: usize, best_bid: Money, allr: std.mem.Allocator) !Order_Book {
         assert(level_count % 2 == 0); // divisible by 2, otherwise uneven sides.
@@ -28,17 +30,11 @@ const Order_Book = struct {
             try price_levels.append(allr, level);
             count += 1;
         }
-        return Order_Book{
-            .tick_size = tick_size,
-            .ba = undefined,
-            .bb = undefined,
-            .price_levels = price_levels,
-            .start_price = price_levels.get(0).price,
-        };
+        return Order_Book{ .tick_size = tick_size, .ba = undefined, .bb = undefined, .price_levels = price_levels, .start_price = price_levels.get(0).price, .level_count = level_count, .allr = allr };
     }
 
-    pub fn deinit(self: *Order_Book, allr: std.mem.Allocator) void {
-        self.price_levels.deinit(allr);
+    pub fn deinit(self: *Order_Book) void {
+        self.price_levels.deinit(self.allr);
     }
 
     pub fn snapshot(self: *Order_Book, bids: []const Level, asks: []const Level) void {
@@ -58,6 +54,13 @@ const Order_Book = struct {
         // TODO(feat) check if index is out of bounds and then realloc.
         assert(copy.to_f64() >= 0.0);
         return @as(usize, @intFromFloat(copy.to_f64()));
+    }
+
+    fn realloc(self: *Order_Book) !void {
+        // https://github.com/jeog/SimpleOrderbook/blob/master/src/orderbook/impl.tpp#L133
+        // Not certain on what behaviour I actually want, but the following seems good for now:
+        // Depending what side of the orderbook the price goes beyond, keep that half
+        // and allocate the other half.
     }
 
     pub fn update(self: *Order_Book, level: Level, side: Side) void {
@@ -119,7 +122,7 @@ const Level = struct {
 test "assert length" {
     const start_price = Money.new(100.0);
     var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
-    defer ob.deinit(std.testing.allocator);
+    defer ob.deinit();
     try std.testing.expect(ob.price_levels.len == 1000);
 }
 
@@ -127,7 +130,7 @@ test "Simple order book update" {
     const start_price = Money.new(100.0);
 
     var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
-    defer ob.deinit(std.testing.allocator);
+    defer ob.deinit();
     const lvl = .{ .price = Money.new(75.0), .qty = Money.new(5.55) };
     const lvl_2 = .{ .price = Money.new(75.05), .qty = Money.new(1.0002) };
     const lvl_3 = .{ .price = Money.new(76), .qty = Money.new(1.22) };
@@ -148,7 +151,7 @@ test "Simple order book update" {
 test "Get the correct level based on price" {
     const start_price = Money.new(10_000.0);
     var ob = try Order_Book.init(0.05, 100, start_price, std.testing.allocator);
-    defer ob.deinit(std.testing.allocator);
+    defer ob.deinit();
 
     ob.update(Level.new(10_000.0, 42.0), .Bid);
     try testing.expect(std.meta.eql(ob.get_level(Money.new(10_000.0)), ob.price_levels.get(50)));
@@ -162,7 +165,7 @@ test "Get the correct level based on price" {
 test "Snapshot" {
     const start_price = Money.new(2500.0);
     var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
-    defer ob.deinit(std.testing.allocator);
+    defer ob.deinit();
     const bids = [_]Level{
         Level.new(2500.0, 1.0),
         Level.new(2499.95, 1.5),
@@ -182,7 +185,7 @@ test "Snapshot" {
 test "Changing BB/BA on updates" {
     const start_price = Money.new(1000.0);
     var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
-    defer ob.deinit(std.testing.allocator);
+    defer ob.deinit();
     const bids = [_]Level{
         Level.new(1000.0, 1.0),
         Level.new(999.95, 1.5),
