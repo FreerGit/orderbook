@@ -3,7 +3,7 @@ const Money = @import("money").Money;
 const testing = std.testing;
 const assert = std.debug.assert;
 
-const Order_Book = struct {
+pub const Order_Book = struct {
     tick_size: f64,
     ba: Level,
     bb: Level,
@@ -105,12 +105,12 @@ const Order_Book = struct {
     }
 };
 
-const Side = enum {
+pub const Side = enum {
     Bid,
     Ask,
 };
 
-const Level = struct {
+pub const Level = struct {
     price: Money,
     qty: Money,
 
@@ -217,6 +217,6 @@ test "Changing BB/BA on updates" {
     try testing.expect(std.meta.eql(Level.new(1000.05, 5.55), ob.ba));
 }
 
-pub fn debug(comptime fmt: []const u8, args: anytype) void {
+fn debug(comptime fmt: []const u8, args: anytype) void {
     std.debug.print(fmt ++ "\n", args);
 }
