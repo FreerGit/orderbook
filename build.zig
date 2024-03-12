@@ -4,10 +4,12 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    _ = b.addModule("orderbook", .{ .root_source_file = .{ .path = "src/main.zig" } });
+    const lib = b.addModule("orderbook", .{ .root_source_file = .{ .path = "src/main.zig" } });
 
     const money_dep = b.dependency("money", .{ .target = target, .optimize = optimize });
     const money_module = money_dep.module("money");
+
+    lib.addImport("money", money_module);
 
     const exe_unit_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
