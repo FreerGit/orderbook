@@ -13,6 +13,20 @@ pub const Order_Book = struct {
     level_count: usize,
     allr: std.mem.Allocator,
 
+    pub const Side = enum {
+        Bid,
+        Ask,
+    };
+
+    pub const Level = struct {
+        price: Money,
+        qty: Money,
+
+        pub fn new(price: f64, qty: f64) Level {
+            return .{ .price = Money.new(price), .qty = Money.new(qty) };
+        }
+    };
+
     pub fn init(tick_size: f64, level_count: usize, best_bid: Money, allr: std.mem.Allocator) !Order_Book {
         assert(level_count % 2 == 0); // divisible by 2, otherwise uneven sides.
         var price_levels = std.MultiArrayList(Level){};
@@ -56,12 +70,12 @@ pub const Order_Book = struct {
         return @as(usize, @intFromFloat(copy.to_f64()));
     }
 
-    fn realloc(self: *Order_Book) !void {
-        // https://github.com/jeog/SimpleOrderbook/blob/master/src/orderbook/impl.tpp#L133
-        // Not certain on what behaviour I actually want, but the following seems good for now:
-        // Depending what side of the orderbook the price goes beyond, keep that half
-        // and allocate the other half.
-    }
+    // fn realloc(self: *Order_Book) !void {
+    //     // https://github.com/jeog/SimpleOrderbook/blob/master/src/orderbook/impl.tpp#L133
+    //     // Not certain on what behaviour I actually want, but the following seems good for now:
+    //     // Depending what side of the orderbook the price goes beyond, keep that half
+    //     // and allocate the other half.
+    // }
 
     pub fn update(self: *Order_Book, level: Level, side: Side) void {
 
@@ -105,20 +119,6 @@ pub const Order_Book = struct {
     }
 };
 
-pub const Side = enum {
-    Bid,
-    Ask,
-};
-
-pub const Level = struct {
-    price: Money,
-    qty: Money,
-
-    pub fn new(price: f64, qty: f64) Level {
-        return .{ .price = Money.new(price), .qty = Money.new(qty) };
-    }
-};
-
 test "assert length" {
     const start_price = Money.new(100.0);
     var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
@@ -153,7 +153,7 @@ test "Get the correct level based on price" {
     var ob = try Order_Book.init(0.05, 100, start_price, std.testing.allocator);
     defer ob.deinit();
 
-    ob.update(Level.new(10_000.0, 42.0), .Bid);
+    ob.update(Order_Book.Level.new(10_000.0, 42.0), .Bid);
     try testing.expect(std.meta.eql(ob.get_level(Money.new(10_000.0)), ob.price_levels.get(50)));
     try testing.expect(std.meta.eql(ob.get_level(Money.new(9997.5)), ob.price_levels.get(0)));
     try testing.expect(std.meta.eql(ob.get_level(Money.new(10_002.45)), ob.price_levels.get(99)));
@@ -166,15 +166,15 @@ test "Snapshot" {
     const start_price = Money.new(2500.0);
     var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
     defer ob.deinit();
-    const bids = [_]Level{
-        Level.new(2500.0, 1.0),
-        Level.new(2499.95, 1.5),
-        Level.new(2499.9, 2.1),
+    const bids = [_]Order_Book.Level{
+        Order_Book.Level.new(2500.0, 1.0),
+        Order_Book.Level.new(2499.95, 1.5),
+        Order_Book.Level.new(2499.9, 2.1),
     };
-    const asks = [_]Level{
-        Level.new(2500.05, 1.0),
-        Level.new(2500.1, 1.5),
-        Level.new(2500.15, 2.1),
+    const asks = [_]Order_Book.Level{
+        Order_Book.Level.new(2500.05, 1.0),
+        Order_Book.Level.new(2500.1, 1.5),
+        Order_Book.Level.new(2500.15, 2.1),
     };
     ob.snapshot(bids[0..], asks[0..]);
 
@@ -186,35 +186,35 @@ test "Changing BB/BA on updates" {
     const start_price = Money.new(1000.0);
     var ob = try Order_Book.init(0.05, 1000, start_price, std.testing.allocator);
     defer ob.deinit();
-    const bids = [_]Level{
-        Level.new(1000.0, 1.0),
-        Level.new(999.95, 1.5),
-        Level.new(999.9, 2.1),
+    const bids = [_]Order_Book.Level{
+        Order_Book.Level.new(1000.0, 1.0),
+        Order_Book.Level.new(999.95, 1.5),
+        Order_Book.Level.new(999.9, 2.1),
     };
-    const asks = [_]Level{
-        Level.new(1000.05, 1.0),
-        Level.new(1000.1, 1.5),
-        Level.new(1000.15, 2.1),
+    const asks = [_]Order_Book.Level{
+        Order_Book.Level.new(1000.05, 1.0),
+        Order_Book.Level.new(1000.1, 1.5),
+        Order_Book.Level.new(1000.15, 2.1),
     };
     ob.snapshot(bids[0..], asks[0..]);
 
     try testing.expect(std.meta.eql(ob.get_level(Money.new(1000.0)), ob.bb));
     try testing.expect(std.meta.eql(ob.get_level(Money.new(1000.05)), ob.ba));
 
-    ob.update(Level.new(1000.0, 0.0), .Bid);
-    const new_best_bid = Level.new(1001.0, 5.0);
+    ob.update(Order_Book.Level.new(1000.0, 0.0), .Bid);
+    const new_best_bid = Order_Book.Level.new(1001.0, 5.0);
     ob.update(new_best_bid, .Bid);
 
     try testing.expect(std.meta.eql(new_best_bid, ob.bb));
     try testing.expect(std.meta.eql(ob.get_level(Money.new(1000.05)), ob.ba));
 
-    ob.update(Level.new(1000.05, 0.0), .Ask);
+    ob.update(Order_Book.Level.new(1000.05, 0.0), .Ask);
     try testing.expect(std.meta.eql(new_best_bid, ob.bb));
-    try testing.expect(std.meta.eql(Level.new(1000.1, 1.5), ob.ba));
+    try testing.expect(std.meta.eql(Order_Book.Level.new(1000.1, 1.5), ob.ba));
 
-    const new_best_ask = Level.new(1000.05, 5.55);
+    const new_best_ask = Order_Book.Level.new(1000.05, 5.55);
     ob.update(new_best_ask, .Ask);
-    try testing.expect(std.meta.eql(Level.new(1000.05, 5.55), ob.ba));
+    try testing.expect(std.meta.eql(Order_Book.Level.new(1000.05, 5.55), ob.ba));
 }
 
 fn debug(comptime fmt: []const u8, args: anytype) void {
